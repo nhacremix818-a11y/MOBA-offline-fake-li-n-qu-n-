@@ -10,8 +10,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
@@ -32,7 +34,6 @@ import com.example.model.Hero
 import com.example.model.HeroRole
 import com.example.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HeroSelectScreen(
     gameMode: GameMode,
@@ -57,71 +58,116 @@ fun HeroSelectScreen(
         modifier = Modifier.fillMaxSize(),
         containerColor = MobaDarkBackground,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                color = MobaSurface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MobaCardBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Left: Back button + Title + Mode
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("hero_select_back_button")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Quay Lại",
+                                tint = TextPrimary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                         Text(
                             text = "CHỌN TƯỚNG LIÊN QUÂN",
                             color = MobaGold,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
+                            fontSize = 14.sp
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(shape = RoundedCornerShape(4.dp), color = MobaSurfaceVariant) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MobaSurfaceVariant
+                        ) {
                             Text(
                                 text = gameMode.title,
                                 color = TextSecondary,
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("hero_select_back_button")
+
+                    // Right: Primary Top Quick-Start Button (Always visible on top bar!)
+                    Button(
+                        onClick = { onStartBattle(selectedHero, selectedTalent) },
+                        modifier = Modifier
+                            .height(34.dp)
+                            .testTag("top_start_battle_button"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MobaGold,
+                            contentColor = Color.Black
+                        ),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Quay Lại",
-                            tint = TextPrimary
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "BẮT ĐẦU NGAY",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MobaSurface)
-            )
+                }
+            }
         }
     ) { innerPadding ->
-        // Widescreen Split Layout: Left Champion Detail & Enter Match, Right Champion Grid
+        // Widescreen Split Layout: Left Panel & Right Roster Grid
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Left Column: Selected Hero Spotlight & Start Battle CTA
+            // Left Card: Hero Spotlight & Pinned "BẮT ĐẦU" Button
             Card(
                 modifier = Modifier
                     .weight(1.1f)
                     .fillMaxHeight(),
                 colors = CardDefaults.cardColors(containerColor = MobaSurface),
-                border = androidx.compose.foundation.BorderStroke(1.5.dp, MobaGold.copy(alpha = 0.6f)),
-                shape = RoundedCornerShape(14.dp)
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, MobaGold.copy(alpha = 0.7f)),
+                shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(12.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+                        .padding(10.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Scrollable Hero details so it never overflows even on low-resolution screens
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         // Hero Header
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(50.dp)
+                                    .size(42.dp)
                                     .clip(CircleShape)
                                     .background(
                                         Brush.radialGradient(
@@ -138,35 +184,49 @@ fun HeroSelectScreen(
                                     text = selectedHero.name.take(2).uppercase(),
                                     color = Color.White,
                                     fontWeight = FontWeight.Black,
-                                    fontSize = 18.sp
+                                    fontSize = 15.sp
                                 )
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = selectedHero.name,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MobaGold.copy(alpha = 0.2f)
+                                    ) {
+                                        Text(
+                                            text = selectedHero.role.displayName,
+                                            color = MobaGold,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
                                 Text(
-                                    text = selectedHero.name,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 16.sp
-                                )
-                                Text(
-                                    text = "${selectedHero.title} • ${selectedHero.role.displayName}",
-                                    color = MobaGold,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = "Độ khó: ${"★".repeat(selectedHero.difficulty)} • ${selectedHero.damageType.displayName}",
+                                    text = "${selectedHero.title} • ${selectedHero.damageType.displayName}",
                                     color = TextSecondary,
                                     fontSize = 10.sp
+                                )
+                                Text(
+                                    text = "Độ khó: ${"★".repeat(selectedHero.difficulty)}",
+                                    color = MobaGoldBright,
+                                    fontSize = 9.sp
                                 )
                             }
                         }
 
-                        Divider(color = MobaCardBorder)
+                        Divider(color = MobaCardBorder, modifier = Modifier.padding(vertical = 2.dp))
 
-                        // 4 Skills Preview Row
-                        Text("KỸ NĂNG CHIẾN ĐẤU:", color = MobaGold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        // Skills Row
+                        Text("KỸ NĂNG:", color = MobaGold, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -177,32 +237,34 @@ fun HeroSelectScreen(
                             SkillMiniChip("Chiêu Cuối", selectedHero.skill3.iconSymbol, selectedHero.skill3.name)
                         }
 
-                        // Talent Selector
+                        // Talent Selection Row
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Text("Bổ trợ:", color = TextSecondary, fontSize = 10.sp)
+                            Text("Bổ trợ:", color = TextSecondary, fontSize = 9.sp)
                             listOf("Tốc Biến", "Bộc Phá", "Trừng Trị", "Cấp Cứu").forEach { talent ->
                                 val isSel = selectedTalent == talent
                                 Surface(
-                                    shape = RoundedCornerShape(6.dp),
+                                    shape = RoundedCornerShape(4.dp),
                                     color = if (isSel) MobaGold else MobaSurfaceVariant,
                                     modifier = Modifier.clickable { selectedTalent = talent }
                                 ) {
                                     Text(
                                         text = talent,
                                         color = if (isSel) Color.Black else TextPrimary,
-                                        fontSize = 10.sp,
+                                        fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
                             }
                         }
                     }
 
-                    // Start Battle CTA
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Pinned Main Action Button: "BẮT ĐẦU TRẬN ĐẤU" (Always 100% visible at bottom of card!)
                     Button(
                         onClick = { onStartBattle(selectedHero, selectedTalent) },
                         modifier = Modifier
@@ -213,12 +275,12 @@ fun HeroSelectScreen(
                             containerColor = MobaGold,
                             contentColor = Color.Black
                         ),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "VÀO TRẬN (${selectedHero.name.uppercase()})",
+                            text = "BẮT ĐẦU (${selectedHero.name.uppercase()})",
                             fontWeight = FontWeight.Black,
                             fontSize = 13.sp
                         )
@@ -226,7 +288,7 @@ fun HeroSelectScreen(
                 }
             }
 
-            // Right Column: Role Filter Tabs + Grid of Heroes
+            // Right Column: Role Filters & Champion Grid
             Column(
                 modifier = Modifier
                     .weight(1.3f)
