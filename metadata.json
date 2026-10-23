@@ -1,0 +1,6 @@
+{
+  "name": "Liên Quân Offline",
+  "description": "MOBA Offline đấu trường chiến thuật với đầy đủ các vị tướng Liên Quân Mobile, kỹ năng, trang bị và chế độ 5v5, 1v1",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
