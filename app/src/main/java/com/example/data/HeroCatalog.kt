@@ -418,7 +418,7 @@ object HeroCatalog {
                 cooldown = 20f,
                 manaCost = 90,
                 isUltimate = true,
-                baseDamage = 950f,
+                baseDamage = 650f,
                 range = 130f,
                 iconSymbol = "🗡️"
             ),
@@ -637,7 +637,7 @@ object HeroCatalog {
                 description = "Bắn ra 5 quả cầu ma thuật hội tụ tại một điểm, gây sát thương phép hủy diệt.",
                 cooldown = 5f,
                 manaCost = 55,
-                baseDamage = 520f,
+                baseDamage = 350f,
                 range = 160f,
                 iconSymbol = "🟢"
             ),
@@ -647,7 +647,7 @@ object HeroCatalog {
                 description = "Bắn ra quả cầu năng lượng bay chậm, khi chạm mục tiêu gây choáng 1s và phát tán khí độc làm chậm.",
                 cooldown = 8f,
                 manaCost = 70,
-                baseDamage = 350f,
+                baseDamage = 280f,
                 range = 140f,
                 iconSymbol = "💫"
             ),
@@ -658,7 +658,7 @@ object HeroCatalog {
                 cooldown = 28f,
                 manaCost = 100,
                 isUltimate = true,
-                baseDamage = 1100f,
+                baseDamage = 680f,
                 range = 190f,
                 iconSymbol = "⚡"
             ),
@@ -778,7 +778,7 @@ object HeroCatalog {
                 cooldown = 30f,
                 manaCost = 80,
                 isUltimate = true,
-                baseDamage = 950f,
+                baseDamage = 650f,
                 range = 150f,
                 iconSymbol = "🌪️"
             ),
@@ -838,7 +838,7 @@ object HeroCatalog {
                 cooldown = 30f,
                 manaCost = 0,
                 isUltimate = true,
-                baseDamage = 850f,
+                baseDamage = 650f,
                 range = 160f,
                 iconSymbol = "☄️"
             ),
@@ -958,7 +958,7 @@ object HeroCatalog {
                 cooldown = 35f,
                 manaCost = 110,
                 isUltimate = true,
-                baseDamage = 850f,
+                baseDamage = 650f,
                 range = 180f,
                 iconSymbol = "🌋"
             ),

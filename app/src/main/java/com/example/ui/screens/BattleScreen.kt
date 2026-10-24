@@ -1054,6 +1054,7 @@ fun SkillWithUpgradeButton(
     onUpgrade: () -> Unit,
     testTag: String
 ) {
+    val isLocked = skillLevel <= 0
     val isOnCooldown = cooldown > 0.05f
 
     Box(modifier = modifier) {
@@ -1062,10 +1063,10 @@ fun SkillWithUpgradeButton(
             Surface(
                 shape = CircleShape,
                 color = MobaGold,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.White),
                 modifier = Modifier
                     .offset(x = 14.dp, y = (-14).dp)
-                    .size(24.dp)
+                    .size(26.dp)
                     .clickable { onUpgrade() }
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -1079,28 +1080,35 @@ fun SkillWithUpgradeButton(
             modifier = Modifier
                 .size(52.dp)
                 .clip(CircleShape)
-                .background(if (isUltimate) MobaRedTeam else MobaSurfaceVariant)
+                .background(
+                    if (isLocked) Color(0xFF1E293B).copy(alpha = 0.85f)
+                    else if (isUltimate) MobaRedTeam
+                    else MobaSurfaceVariant
+                )
                 .border(
                     width = if (isUltimate) 2.dp else 1.5.dp,
-                    color = if (isUltimate) MobaGold else MobaBlueTeam,
+                    color = if (isLocked) Color(0xFF475569) else if (isUltimate) MobaGold else MobaBlueTeam,
                     shape = CircleShape
                 )
-                .clickable(enabled = !isOnCooldown) { onCast() }
+                .clickable(enabled = !isLocked && !isOnCooldown) { onCast() }
                 .testTag(testTag),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = skill.iconSymbol, fontSize = 18.sp)
                 Text(
-                    text = if (isUltimate) "ULTI" else skill.name.take(4),
-                    color = TextPrimary,
+                    text = if (isLocked) "🔒" else skill.iconSymbol,
+                    fontSize = 18.sp
+                )
+                Text(
+                    text = if (isLocked) "KHÓA" else if (isUltimate) "ULTI" else skill.name.take(4),
+                    color = if (isLocked) TextSecondary else TextPrimary,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
             }
 
-            if (isOnCooldown) {
+            if (isOnCooldown && !isLocked) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1112,6 +1120,26 @@ fun SkillWithUpgradeButton(
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        // Skill Level Pips below button
+        if (skillLevel > 0) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = 4.dp),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)
+            ) {
+                val maxPips = if (isUltimate) 3 else 6
+                for (p in 1..maxPips) {
+                    Box(
+                        modifier = Modifier
+                            .size(3.5.dp)
+                            .clip(CircleShape)
+                            .background(if (p <= skillLevel) MobaGold else Color(0xFF475569))
                     )
                 }
             }

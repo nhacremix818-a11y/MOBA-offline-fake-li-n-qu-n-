@@ -40,6 +40,7 @@ data class Hero(
     val baseMp: Float = 480f,
     val baseAttack: Float = 175f,
     val baseDefense: Float = 120f,
+    val baseMagicResist: Float = 100f,
     val attackRange: Float = 55f, // melee 50-60f, ranged 150-180f
     val moveSpeed: Float = 120f,
     val passive: HeroSkill,

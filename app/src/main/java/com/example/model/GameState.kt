@@ -50,6 +50,8 @@ data class CombatEntity(
     var stunDuration: Float = 0f,
     var shield: Float = 0f,
     var speedBonus: Float = 0f,
+    var attackCooldown: Float = 0f,
+    var aiActionDelay: Float = 0f,
     var isAi: Boolean = true,
     var lane: Lane = Lane.MID,
     var targetEnemyId: String? = null

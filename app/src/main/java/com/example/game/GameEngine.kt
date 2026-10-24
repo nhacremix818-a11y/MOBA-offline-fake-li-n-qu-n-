@@ -78,7 +78,9 @@ class GameEngine(
             x = 120f,
             y = 120f,
             isAi = false,
-            lane = if (mode == GameMode.ONE_VS_ONE) Lane.MID else Lane.BOT
+            lane = if (mode == GameMode.ONE_VS_ONE) Lane.MID else Lane.BOT,
+            skill3Cd = if (mode == GameMode.PRACTICE) 0f else playerHero.skill3.cooldown,
+            skill3Level = if (mode == GameMode.PRACTICE) 1 else 0
         )
         entityList.add(player)
 
@@ -102,7 +104,10 @@ class GameEngine(
                         x = 110f + i * 20f,
                         y = 110f + i * 15f,
                         isAi = true,
-                        lane = allyLanes[i]
+                        lane = allyLanes[i],
+                        skill3Cd = hero.skill3.cooldown,
+                        skill3Level = 0,
+                        aiActionDelay = 1.0f
                     )
                 )
             }
@@ -120,7 +125,10 @@ class GameEngine(
                         x = 880f - i * 15f,
                         y = 880f - i * 20f,
                         isAi = true,
-                        lane = enemyLanes[i]
+                        lane = enemyLanes[i],
+                        skill3Cd = hero.skill3.cooldown,
+                        skill3Level = 0,
+                        aiActionDelay = 1.0f
                     )
                 )
             }
@@ -136,7 +144,10 @@ class GameEngine(
                     x = 880f,
                     y = 880f,
                     isAi = true,
-                    lane = Lane.MID
+                    lane = Lane.MID,
+                    skill3Cd = if (mode == GameMode.PRACTICE) 0f else enemyHero.skill3.cooldown,
+                    skill3Level = if (mode == GameMode.PRACTICE) 1 else 0,
+                    aiActionDelay = 1.0f
                 )
             )
         }
@@ -329,10 +340,18 @@ class GameEngine(
                 e.stunDuration -= dt
             }
 
-            // Health & mana natural regen
+            if (e.attackCooldown > 0f) {
+                e.attackCooldown = (e.attackCooldown - dt).coerceAtLeast(0f)
+            }
+
+            if (e.aiActionDelay > 0f) {
+                e.aiActionDelay = (e.aiActionDelay - dt).coerceAtLeast(0f)
+            }
+
+            // Health & mana natural regen (18 HP/s out of combat)
             if (!e.isDead) {
-                e.hp = (e.hp + 12f * dt).coerceAtMost(e.maxHp)
-                e.mp = (e.mp + 8f * dt).coerceAtMost(e.maxMp)
+                e.hp = (e.hp + 18f * dt).coerceAtMost(e.maxHp)
+                e.mp = (e.mp + 12f * dt).coerceAtMost(e.maxMp)
             }
 
             // Respawn timer
@@ -387,7 +406,7 @@ class GameEngine(
         val distToEnemy = enemy?.let { hypot(it.x - bot.x, it.y - bot.y) } ?: Float.MAX_VALUE
 
         // If low HP, retreat toward own Nexus
-        if (bot.hp < bot.maxHp * 0.28f) {
+        if (bot.hp < bot.maxHp * 0.25f) {
             val (baseX, baseY) = if (bot.team == Team.BLUE) Pair(100f, 100f) else Pair(900f, 900f)
             moveTowards(bot, baseX, baseY, dt * 1.1f)
             return
@@ -395,25 +414,33 @@ class GameEngine(
 
         // Combat range check
         if (enemy != null && distToEnemy < bot.hero.attackRange * 1.8f) {
-            // Cast skill 1 or 2 or 3 if ready
-            if (bot.skill3Cd <= 0f && distToEnemy < bot.hero.skill3.range) {
-                castSkillAi(bot, 3, enemy)
-            } else if (bot.skill1Cd <= 0f && distToEnemy < bot.hero.skill1.range) {
-                castSkillAi(bot, 1, enemy)
-            } else if (bot.skill2Cd <= 0f && distToEnemy < bot.hero.skill2.range) {
-                castSkillAi(bot, 2, enemy)
-            } else {
-                // Auto attack
-                performAutoAttack(bot, enemy)
+            // Human-like casting interval (prevents 1-frame multi-skill blast)
+            if (bot.aiActionDelay <= 0f) {
+                val canCastUlt = (bot.level >= 4 || practiceNoCooldown) && bot.skill3Cd <= 0f && distToEnemy < bot.hero.skill3.range
+                val canCastS1 = bot.skill1Cd <= 0f && distToEnemy < bot.hero.skill1.range
+                val canCastS2 = bot.skill2Cd <= 0f && distToEnemy < bot.hero.skill2.range
+
+                if (canCastUlt) {
+                    castSkillAi(bot, 3, enemy)
+                    bot.aiActionDelay = 1.1f
+                } else if (canCastS1) {
+                    castSkillAi(bot, 1, enemy)
+                    bot.aiActionDelay = 0.85f
+                } else if (canCastS2) {
+                    castSkillAi(bot, 2, enemy)
+                    bot.aiActionDelay = 0.85f
+                } else if (bot.attackCooldown <= 0f && distToEnemy <= bot.hero.attackRange * 1.25f) {
+                    performAutoAttack(bot, enemy)
+                }
             }
 
             // Maintain distance or kite
-            if (bot.hero.attackRange > 100f && distToEnemy < 80f) {
+            if (bot.hero.attackRange > 100f && distToEnemy < 85f) {
                 // Ranged kite away
                 val dx = bot.x - enemy.x
                 val dy = bot.y - enemy.y
                 val len = max(1f, hypot(dx, dy))
-                moveTowards(bot, bot.x + (dx / len) * 80f, bot.y + (dy / len) * 80f, dt)
+                moveTowards(bot, bot.x + (dx / len) * 85f, bot.y + (dy / len) * 85f, dt)
             } else if (distToEnemy > bot.hero.attackRange) {
                 moveTowards(bot, enemy.x, enemy.y, dt)
             }
@@ -427,7 +454,10 @@ class GameEngine(
 
             if (targetMinion != null && hypot(targetMinion.x - bot.x, targetMinion.y - bot.y) < 180f) {
                 if (hypot(targetMinion.x - bot.x, targetMinion.y - bot.y) <= bot.hero.attackRange) {
-                    damageMinion(bot, targetMinion, bot.hero.baseAttack * 0.8f)
+                    if (bot.attackCooldown <= 0f) {
+                        bot.attackCooldown = 1.0f
+                        damageMinion(bot, targetMinion, bot.hero.baseAttack * 0.8f)
+                    }
                 } else {
                     moveTowards(bot, targetMinion.x, targetMinion.y, dt)
                 }
@@ -638,8 +668,13 @@ class GameEngine(
     fun playerBasicAttack() {
         val player = getPlayer() ?: return
         if (player.isDead || player.stunDuration > 0f) return
+        if (player.attackCooldown > 0f) return
 
         player.isRecalling = false
+
+        // Cooldown between basic attacks based on attack speed
+        val atkSpeed = calculateAttackSpeed(player)
+        player.attackCooldown = (1.0f / atkSpeed).coerceIn(0.35f, 1.2f)
 
         // Find nearest enemy (Hero preferred, then Jungle, then Minion, then Tower)
         val enemyHero = _entities.value.filter { it.team != player.team && !it.isDead && hypot(it.x - player.x, it.y - player.y) <= player.hero.attackRange * 1.2f }
@@ -690,7 +725,11 @@ class GameEngine(
     fun playerAttackMinion() {
         val player = getPlayer() ?: return
         if (player.isDead || player.stunDuration > 0f) return
+        if (player.attackCooldown > 0f) return
         player.isRecalling = false
+
+        val atkSpeed = calculateAttackSpeed(player)
+        player.attackCooldown = (1.0f / atkSpeed).coerceIn(0.35f, 1.2f)
 
         val enemyMinion = _minions.value.filter { it.team != player.team && !it.isDead && hypot(it.x - player.x, it.y - player.y) <= player.hero.attackRange * 1.3f }
             .minByOrNull { hypot(it.x - player.x, it.y - player.y) }
@@ -721,7 +760,11 @@ class GameEngine(
     fun playerAttackTower() {
         val player = getPlayer() ?: return
         if (player.isDead || player.stunDuration > 0f) return
+        if (player.attackCooldown > 0f) return
         player.isRecalling = false
+
+        val atkSpeed = calculateAttackSpeed(player)
+        player.attackCooldown = (1.0f / atkSpeed).coerceIn(0.35f, 1.2f)
 
         val enemyTower = _towers.value.filter { it.team != player.team && !it.isDestroyed && hypot(it.x - player.x, it.y - player.y) <= player.hero.attackRange * 1.3f }
             .minByOrNull { hypot(it.x - player.x, it.y - player.y) }
@@ -763,6 +806,18 @@ class GameEngine(
 
     private fun performAutoAttack(attacker: CombatEntity, target: CombatEntity) {
         val totalAtk = calculateTotalAttack(attacker)
+        var isCrit = false
+        var critBonus = 1.0f
+        var totalCritChance = 0f
+        attacker.inventory.forEach {
+            totalCritChance += it.critChance
+            if (it.id == "thanh_kiem") critBonus = 1.5f
+        }
+        if (Math.random() < totalCritChance) {
+            isCrit = true
+        }
+        val finalDmg = if (isCrit) totalAtk * (1.5f + critBonus * 0.5f) else totalAtk
+
         if (attacker.hero.attackRange > 100f) {
             // Ranged projectile
             createProjectile(
@@ -772,7 +827,7 @@ class GameEngine(
                 startY = attacker.y,
                 targetX = target.x,
                 targetY = target.y,
-                damage = totalAtk,
+                damage = finalDmg,
                 type = attacker.hero.damageType,
                 color = attacker.hero.themeColorHex,
                 isHoming = true,
@@ -780,7 +835,10 @@ class GameEngine(
             )
         } else {
             // Melee instant strike
-            dealDamageToHero(attacker, target, totalAtk, attacker.hero.damageType)
+            dealDamageToHero(attacker, target, finalDmg, attacker.hero.damageType)
+        }
+        if (isCrit) {
+            addFloatingText("CHÍ MẠNG!", attacker.x, attacker.y - 30f, 0xFFFF1744)
         }
     }
 
@@ -807,6 +865,7 @@ class GameEngine(
 
         when (skillNum) {
             1 -> {
+                if (player.skill1Level <= 0 && !practiceGodMode && mode != GameMode.PRACTICE) return
                 if (player.skill1Cd > 0f && !practiceNoCooldown) return
                 if (player.mp < player.hero.skill1.manaCost && !practiceGodMode) return
                 player.mp -= player.hero.skill1.manaCost
@@ -815,6 +874,7 @@ class GameEngine(
                 soundAndHaptic?.playSkillCast()
             }
             2 -> {
+                if (player.skill2Level <= 0 && !practiceGodMode && mode != GameMode.PRACTICE) return
                 if (player.skill2Cd > 0f && !practiceNoCooldown) return
                 if (player.mp < player.hero.skill2.manaCost && !practiceGodMode) return
                 player.mp -= player.hero.skill2.manaCost
@@ -823,6 +883,7 @@ class GameEngine(
                 soundAndHaptic?.playSkillCast()
             }
             3 -> {
+                if (player.skill3Level <= 0 && !practiceGodMode && mode != GameMode.PRACTICE) return
                 if (player.skill3Cd > 0f && !practiceNoCooldown) return
                 if (player.mp < player.hero.skill3.manaCost && !practiceGodMode) return
                 player.mp -= player.hero.skill3.manaCost
@@ -912,7 +973,7 @@ class GameEngine(
     }
 
     private fun applySkillDamage(caster: CombatEntity, target: CombatEntity, skill: HeroSkill) {
-        val totalDmg = skill.baseDamage + (caster.level * 45f)
+        val totalDmg = skill.baseDamage + (caster.level * 22f)
         dealDamageToHero(caster, target, totalDmg, caster.hero.damageType)
     }
 
@@ -960,12 +1021,40 @@ class GameEngine(
         if (victim.isDead) return
 
         var actualDmg = amount
-        if (type == DamageType.VAT_LY) {
-            val def = victim.hero.baseDefense + (victim.level * 18f)
-            actualDmg = amount * (600f / (600f + def))
+        when (type) {
+            DamageType.VAT_LY -> {
+                val armor = calculateTotalArmor(victim)
+                actualDmg = amount * (600f / (600f + armor))
+            }
+            DamageType.PHEP -> {
+                val magicResist = calculateTotalMagicResist(victim)
+                actualDmg = amount * (600f / (600f + magicResist))
+            }
+            DamageType.CHUAN -> {
+                actualDmg = amount
+            }
         }
 
-        victim.hp -= actualDmg
+        // Damage Cap: Prevent instant 1-shot (ensures authentic Liên Quân TTK and skill combos)
+        // A single skill/hit cannot wipe more than 28% max HP at early game (level < 4), or 38% at late game
+        val maxSingleHit = if (victim.level < 4) victim.maxHp * 0.28f else victim.maxHp * 0.38f
+        if (actualDmg > maxSingleHit && type != DamageType.CHUAN) {
+            actualDmg = maxSingleHit
+        }
+
+        // Shield absorption
+        if (victim.shield > 0f) {
+            if (victim.shield >= actualDmg) {
+                victim.shield -= actualDmg
+                addFloatingText("Chặn Lớp Khiên!", victim.x, victim.y - 20f, 0xFFFFFFFF)
+                return
+            } else {
+                actualDmg -= victim.shield
+                victim.shield = 0f
+            }
+        }
+
+        victim.hp = (victim.hp - actualDmg).coerceAtLeast(0f)
 
         val color = when (type) {
             DamageType.VAT_LY -> 0xFFFF9100 // Orange
@@ -1041,10 +1130,25 @@ class GameEngine(
         if (entity.exp >= nextExp && entity.level < 15) {
             entity.exp -= nextExp
             entity.level += 1
-            entity.maxHp += 260f
-            entity.hp += 260f
+            val hpGain = when (entity.hero.role) {
+                HeroRole.DO_DON, HeroRole.TRO_THU -> 480f
+                HeroRole.DAU_SI -> 400f
+                else -> 330f
+            }
+            entity.maxHp += hpGain
+            entity.hp += hpGain
             entity.maxMp += 40f
             entity.availableSkillPoints += 1
+
+            if (entity.isAi) {
+                if (entity.level in listOf(4, 8, 12)) {
+                    entity.skill3Level += 1
+                } else if (entity.skill1Level <= entity.skill2Level) {
+                    entity.skill1Level += 1
+                } else {
+                    entity.skill2Level += 1
+                }
+            }
             addFloatingText("CẤP ${entity.level}!", entity.x, entity.y - 30f, 0xFFFFD700)
         }
     }
@@ -1052,7 +1156,25 @@ class GameEngine(
     private fun calculateTotalAttack(entity: CombatEntity): Float {
         var bonus = 0f
         entity.inventory.forEach { bonus += it.attackBonus }
-        return entity.hero.baseAttack + (entity.level * 15f) + bonus
+        return entity.hero.baseAttack + (entity.level * 14f) + bonus
+    }
+
+    private fun calculateTotalArmor(entity: CombatEntity): Float {
+        var bonus = 0f
+        entity.inventory.forEach { bonus += it.armorBonus }
+        return entity.hero.baseDefense + (entity.level * 18f) + bonus
+    }
+
+    private fun calculateTotalMagicResist(entity: CombatEntity): Float {
+        var bonus = 0f
+        entity.inventory.forEach { bonus += it.magicResistBonus }
+        return entity.hero.baseMagicResist + (entity.level * 14f) + bonus
+    }
+
+    private fun calculateAttackSpeed(entity: CombatEntity): Float {
+        var bonus = 0f
+        entity.inventory.forEach { bonus += it.attackSpeed }
+        return 1.0f + bonus
     }
 
     private fun createProjectile(
